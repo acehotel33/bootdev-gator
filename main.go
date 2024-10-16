@@ -9,11 +9,9 @@ import (
 	"github.com/acehotel33/bootdev-gator/internal/state"
 )
 
-const user = "vakho"
-
 func main() {
 	// Initialize config
-	cfg, err := config.InitializeConfig(user)
+	cfg, err := config.InitializeConfig()
 	if err != nil {
 		log.Fatalf("Failed to initialize config: %v", err)
 	}
@@ -25,10 +23,14 @@ func main() {
 	}
 
 	// Initialize commands
-	_, err = commands.InitializeCommands()
+	cmds, err := commands.InitializeCommands()
 	if err != nil {
 		log.Fatalf("Failed to initialize commands: %v", err)
 	}
 
+	// Run commands
+	commands.RunCommand(state, cmds)
+
 	fmt.Println(state.Cfg)
+
 }
