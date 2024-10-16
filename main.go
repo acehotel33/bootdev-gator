@@ -2,25 +2,33 @@ package main
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/acehotel33/bootdev-gator/internal/commands"
 	"github.com/acehotel33/bootdev-gator/internal/config"
+	"github.com/acehotel33/bootdev-gator/internal/state"
 )
 
 const user = "vakho"
 
 func main() {
-	cfg, err := config.Read()
+	// Initialize config
+	cfg, err := config.InitializeConfig(user)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to initialize config: %v", err)
 	}
 
-	if err := cfg.SetUser(user); err != nil {
-		panic(err)
+	// Initialize State
+	state, err := state.InitializeState(cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize state: %v", err)
 	}
 
-	cfg, err = config.Read()
+	// Initialize commands
+	_, err = commands.InitializeCommands()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to initialize commands: %v", err)
 	}
-	fmt.Println(cfg)
+
+	fmt.Println(state.Cfg)
 }

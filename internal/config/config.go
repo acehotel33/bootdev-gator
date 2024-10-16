@@ -12,6 +12,18 @@ type Config struct {
 	CurrentUsername string `json:"current_user_name"`
 }
 
+func InitializeConfig(user string) (*Config, error) {
+	cfg, err := Read()
+	if err != nil {
+		return &Config{}, err
+	}
+	err = cfg.SetUser(user)
+	if err != nil {
+		return &Config{}, err
+	}
+	return &cfg, nil
+}
+
 func (cfg *Config) SetUser(user string) error {
 	cfg.CurrentUsername = user
 
