@@ -27,6 +27,7 @@ func InitializeCommands() (*Commands, error) {
 	}
 	cmds.Register("login", HandlerLogin)
 	cmds.Register("register", HandlerRegister)
+	cmds.Register("reset", HandlerReset)
 	return cmds, nil
 }
 
@@ -98,5 +99,19 @@ func HandlerLogin(s *state.State, cmd command) error {
 		return err
 	}
 	fmt.Printf("\nUser has been set to: %v\n", username)
+	return nil
+}
+
+func HandlerReset(s *state.State, cmd command) error {
+	if len(cmd.arguments) != 0 {
+		log.Fatalf("invalid arguments")
+	}
+
+	if err := s.DB.ResetUsers(context.Background()); err != nil {
+		log.Fatalf("could not reset users")
+	}
+
+	log.Println("users reset")
+	os.Exit(0)
 	return nil
 }
