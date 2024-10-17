@@ -20,8 +20,8 @@ func InitializeConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-func (cfg *Config) SetUser(user string) error {
-	cfg.CurrentUsername = user
+func (cfg *Config) SetUser(username string) error {
+	cfg.CurrentUsername = username
 
 	cfgJSON, err := json.Marshal(cfg)
 	if err != nil {

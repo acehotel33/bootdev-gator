@@ -1,12 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
 
 	"github.com/acehotel33/bootdev-gator/internal/commands"
 	"github.com/acehotel33/bootdev-gator/internal/config"
+	"github.com/acehotel33/bootdev-gator/internal/database"
 	"github.com/acehotel33/bootdev-gator/internal/state"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -22,6 +24,14 @@ func main() {
 		log.Fatalf("Failed to initialize state: %v", err)
 	}
 
+	// Connect to database and store in state
+	db, err := sql.Open("postgres", cfg.DBURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database")
+	}
+	dbQueries := database.New(db)
+	state.DB = dbQueries
+
 	// Initialize commands
 	cmds, err := commands.InitializeCommands()
 	if err != nil {
@@ -30,7 +40,5 @@ func main() {
 
 	// Run commands
 	commands.RunCommand(state, cmds)
-
-	fmt.Println(state.Cfg)
 
 }

@@ -1,10 +1,15 @@
 package commands
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"time"
 
+	"github.com/acehotel33/bootdev-gator/internal/database"
 	"github.com/acehotel33/bootdev-gator/internal/state"
+	"github.com/google/uuid"
 )
 
 type command struct {
@@ -21,6 +26,7 @@ func InitializeCommands() (*Commands, error) {
 		commandsMap: map[string]func(*state.State, command) error{},
 	}
 	cmds.Register("login", HandlerLogin)
+	cmds.Register("register", HandlerRegister)
 	return cmds, nil
 }
 
@@ -53,12 +59,41 @@ func (c *Commands) Run(s *state.State, cmd command) error {
 	return fmt.Errorf("invalid command")
 }
 
+func HandlerRegister(s *state.State, cmd command) error {
+	if len(cmd.arguments) != 1 {
+		log.Fatalf("invalid arguments")
+	}
+
+	username := cmd.arguments[0]
+	createUserParams := database.CreateUserParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      username,
+	}
+
+	user, err := s.DB.CreateUser(context.Background(), createUserParams)
+	if err != nil {
+		log.Fatalf("could not register user")
+	}
+
+	s.Cfg.SetUser(username)
+	log.Printf("user %v created", username)
+	log.Println(user)
+
+	return nil
+}
+
 func HandlerLogin(s *state.State, cmd command) error {
 	if len(cmd.arguments) == 0 || len(cmd.arguments) > 1 {
 		fmt.Println("invalid arguments")
 		os.Exit(1)
 	}
 	username := cmd.arguments[0]
+	_, err := s.DB.GetUser(context.Background(), username)
+	if err != nil {
+		log.Fatalf("could not log in")
+	}
 	if err := s.Cfg.SetUser(username); err != nil {
 		return err
 	}
