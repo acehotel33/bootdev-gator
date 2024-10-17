@@ -28,6 +28,7 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("login", HandlerLogin)
 	cmds.Register("register", HandlerRegister)
 	cmds.Register("reset", HandlerReset)
+	cmds.Register("users", HandlerGetAllUsers)
 	return cmds, nil
 }
 
@@ -112,6 +113,24 @@ func HandlerReset(s *state.State, cmd command) error {
 	}
 
 	log.Println("users reset")
+	os.Exit(0)
+	return nil
+}
+
+func HandlerGetAllUsers(s *state.State, cmd command) error {
+	users, err := s.DB.GetAllUsers(context.Background())
+	if err != nil {
+		log.Fatalf("could not get users")
+	}
+
+	for _, user := range users {
+		line := "* " + user.Name
+		if user.Name == s.Cfg.CurrentUsername {
+			line = line + " (current)"
+		}
+		fmt.Println(line)
+	}
+
 	os.Exit(0)
 	return nil
 }
