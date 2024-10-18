@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/acehotel33/bootdev-gator/internal/database"
+	"github.com/acehotel33/bootdev-gator/internal/rss"
 	"github.com/acehotel33/bootdev-gator/internal/state"
 	"github.com/google/uuid"
 )
@@ -29,6 +30,7 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("register", HandlerRegister)
 	cmds.Register("reset", HandlerReset)
 	cmds.Register("users", HandlerGetAllUsers)
+	cmds.Register("agg", HandlerAggregator)
 	return cmds, nil
 }
 
@@ -132,5 +134,15 @@ func HandlerGetAllUsers(s *state.State, cmd command) error {
 	}
 
 	os.Exit(0)
+	return nil
+}
+
+func HandlerAggregator(s *state.State, cmd command) error {
+	rssFeed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(rssFeed)
 	return nil
 }
