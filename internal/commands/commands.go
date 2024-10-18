@@ -2,8 +2,8 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -31,13 +31,13 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("reset", HandlerReset)
 	cmds.Register("users", HandlerGetAllUsers)
 	cmds.Register("agg", HandlerAggregator)
+	cmds.Register("addfeed", HandlerAddFeed)
 	return cmds, nil
 }
 
-func RunCommand(state *state.State, cmds *Commands) {
+func RunCommand(state *state.State, cmds *Commands) error {
 	if len(os.Args) < 2 {
-		fmt.Println("Error: Not enough arguments")
-		os.Exit(1)
+		return errors.New("not enough arguments")
 	}
 
 	commandName := os.Args[1]
@@ -48,7 +48,11 @@ func RunCommand(state *state.State, cmds *Commands) {
 		arguments: commandArgs,
 	}
 
-	cmds.Run(state, cmd)
+	if err := cmds.Run(state, cmd); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Commands) Register(name string, f func(*state.State, command) error) {
@@ -57,7 +61,9 @@ func (c *Commands) Register(name string, f func(*state.State, command) error) {
 
 func (c *Commands) Run(s *state.State, cmd command) error {
 	if f, ok := c.commandsMap[cmd.name]; ok {
-		f(s, cmd)
+		if err := f(s, cmd); err != nil {
+			return err
+		}
 		return nil
 	}
 	return fmt.Errorf("invalid command")
@@ -65,7 +71,7 @@ func (c *Commands) Run(s *state.State, cmd command) error {
 
 func HandlerRegister(s *state.State, cmd command) error {
 	if len(cmd.arguments) != 1 {
-		log.Fatalf("invalid arguments")
+		return errors.New("invalid arguments")
 	}
 
 	username := cmd.arguments[0]
@@ -78,51 +84,50 @@ func HandlerRegister(s *state.State, cmd command) error {
 
 	user, err := s.DB.CreateUser(context.Background(), createUserParams)
 	if err != nil {
-		log.Fatalf("could not register user")
+		return errors.New("could not register user")
 	}
 
 	s.Cfg.SetUser(username)
-	log.Printf("user %v created", username)
-	log.Println(user)
+	fmt.Printf("user %v created\n", username)
+	fmt.Println(user)
 
 	return nil
 }
 
 func HandlerLogin(s *state.State, cmd command) error {
 	if len(cmd.arguments) == 0 || len(cmd.arguments) > 1 {
-		fmt.Println("invalid arguments")
-		os.Exit(1)
+		return errors.New("invalid arguments")
 	}
+
 	username := cmd.arguments[0]
 	_, err := s.DB.GetUser(context.Background(), username)
 	if err != nil {
-		log.Fatalf("could not log in")
+		return errors.New("could not log in")
 	}
 	if err := s.Cfg.SetUser(username); err != nil {
 		return err
 	}
-	fmt.Printf("\nUser has been set to: %v\n", username)
+	fmt.Printf("user has been set to: %v\n", username)
 	return nil
 }
 
 func HandlerReset(s *state.State, cmd command) error {
 	if len(cmd.arguments) != 0 {
-		log.Fatalf("invalid arguments")
+		return errors.New("invalid arguments")
 	}
 
 	if err := s.DB.ResetUsers(context.Background()); err != nil {
-		log.Fatalf("could not reset users")
+		return errors.New("could not reset users")
 	}
 
-	log.Println("users reset")
-	os.Exit(0)
+	fmt.Println("users reset")
 	return nil
 }
 
 func HandlerGetAllUsers(s *state.State, cmd command) error {
 	users, err := s.DB.GetAllUsers(context.Background())
 	if err != nil {
-		log.Fatalf("could not get users")
+		return errors.New("could not get users")
 	}
 
 	for _, user := range users {
@@ -133,16 +138,59 @@ func HandlerGetAllUsers(s *state.State, cmd command) error {
 		fmt.Println(line)
 	}
 
-	os.Exit(0)
 	return nil
 }
 
 func HandlerAggregator(s *state.State, cmd command) error {
+	if len(cmd.arguments) != 0 {
+		return errors.New("invalid arguments")
+	}
+
 	rssFeed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
 	if err != nil {
 		return err
 	}
 
 	fmt.Println(rssFeed)
+	return nil
+}
+
+func HandlerAddFeed(s *state.State, cmd command) error {
+	if len(cmd.arguments) != 2 {
+		return errors.New("invalid arguments")
+	}
+	feedName := cmd.arguments[0]
+	feedURL := cmd.arguments[1]
+
+	currentUsername := s.Cfg.CurrentUsername
+	currentUser, err := s.DB.GetUser(context.Background(), currentUsername)
+	if err != nil {
+		return err
+	}
+	currentUserID := currentUser.ID
+
+	_, err = rss.FetchFeed(context.Background(), feedURL)
+	if err != nil {
+		return err
+	}
+
+	createFeedParams := database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      feedName,
+		Url:       feedURL,
+		UserID: uuid.NullUUID{
+			UUID:  currentUserID,
+			Valid: true,
+		},
+	}
+
+	dbFeed, err := s.DB.CreateFeed(context.Background(), createFeedParams)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(dbFeed)
 	return nil
 }

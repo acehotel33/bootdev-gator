@@ -2,7 +2,9 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/acehotel33/bootdev-gator/internal/commands"
 	"github.com/acehotel33/bootdev-gator/internal/config"
@@ -39,6 +41,9 @@ func main() {
 	}
 
 	// Run commands
-	commands.RunCommand(state, cmds)
-
+	if err := commands.RunCommand(state, cmds); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
