@@ -32,6 +32,7 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("users", HandlerGetAllUsers)
 	cmds.Register("agg", HandlerAggregator)
 	cmds.Register("addfeed", HandlerAddFeed)
+	cmds.Register("feeds", HandlerFeeds)
 	return cmds, nil
 }
 
@@ -192,5 +193,40 @@ func HandlerAddFeed(s *state.State, cmd command) error {
 	}
 
 	fmt.Println(dbFeed)
+	return nil
+}
+
+func HandlerFeeds(s *state.State, cmd command) error {
+	if len(cmd.arguments) != 0 {
+		return errors.New("invalid arguments")
+	}
+
+	feed, err := s.DB.GetFeeds(context.Background())
+	if err != nil {
+		return err
+	}
+
+	type returnParams struct {
+		Name     string
+		Url      string
+		Username string
+	}
+
+	for _, item := range feed {
+		dbUser, err := s.DB.GetUserByID(context.Background(), item.UserID.UUID)
+		if err != nil {
+			return err
+		}
+		userName := dbUser.Name
+
+		params := returnParams{
+			Name:     item.Name,
+			Url:      item.Url,
+			Username: userName,
+		}
+
+		fmt.Println(params)
+	}
+
 	return nil
 }
