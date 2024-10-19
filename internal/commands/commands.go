@@ -13,28 +13,28 @@ import (
 	"github.com/google/uuid"
 )
 
-type command struct {
+type Command struct {
 	name      string
 	arguments []string
 }
 
 type Commands struct {
-	commandsMap map[string]func(*state.State, command) error
+	commandsMap map[string]func(*state.State, Command) error
 }
 
 func InitializeCommands() (*Commands, error) {
 	cmds := &Commands{
-		commandsMap: map[string]func(*state.State, command) error{},
+		commandsMap: map[string]func(*state.State, Command) error{},
 	}
 	cmds.Register("login", HandlerLogin)
 	cmds.Register("register", HandlerRegister)
 	cmds.Register("reset", HandlerReset)
 	cmds.Register("users", HandlerGetAllUsers)
 	cmds.Register("agg", HandlerAggregator)
-	cmds.Register("addfeed", HandlerAddFeed)
+	cmds.Register("addfeed", middlewareLoggedIn(HandlerAddFeed))
 	cmds.Register("feeds", HandlerFeeds)
-	cmds.Register("follow", HandlerFollow)
-	cmds.Register("following", HandlerFollowing)
+	cmds.Register("follow", middlewareLoggedIn(HandlerFollow))
+	cmds.Register("following", middlewareLoggedIn(HandlerFollowing))
 	return cmds, nil
 }
 
@@ -46,7 +46,7 @@ func RunCommand(state *state.State, cmds *Commands) error {
 	commandName := os.Args[1]
 	commandArgs := os.Args[2:]
 
-	cmd := command{
+	cmd := Command{
 		name:      commandName,
 		arguments: commandArgs,
 	}
@@ -58,11 +58,11 @@ func RunCommand(state *state.State, cmds *Commands) error {
 	return nil
 }
 
-func (c *Commands) Register(name string, f func(*state.State, command) error) {
+func (c *Commands) Register(name string, f func(*state.State, Command) error) {
 	c.commandsMap[name] = f
 }
 
-func (c *Commands) Run(s *state.State, cmd command) error {
+func (c *Commands) Run(s *state.State, cmd Command) error {
 	if f, ok := c.commandsMap[cmd.name]; ok {
 		if err := f(s, cmd); err != nil {
 			return err
@@ -72,7 +72,7 @@ func (c *Commands) Run(s *state.State, cmd command) error {
 	return fmt.Errorf("invalid command")
 }
 
-func HandlerRegister(s *state.State, cmd command) error {
+func HandlerRegister(s *state.State, cmd Command) error {
 	if len(cmd.arguments) != 1 {
 		return errors.New("invalid arguments")
 	}
@@ -97,7 +97,7 @@ func HandlerRegister(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerLogin(s *state.State, cmd command) error {
+func HandlerLogin(s *state.State, cmd Command) error {
 	if len(cmd.arguments) == 0 || len(cmd.arguments) > 1 {
 		return errors.New("invalid arguments")
 	}
@@ -114,7 +114,7 @@ func HandlerLogin(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerReset(s *state.State, cmd command) error {
+func HandlerReset(s *state.State, cmd Command) error {
 	if len(cmd.arguments) != 0 {
 		return errors.New("invalid arguments")
 	}
@@ -127,7 +127,7 @@ func HandlerReset(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerGetAllUsers(s *state.State, cmd command) error {
+func HandlerGetAllUsers(s *state.State, cmd Command) error {
 	users, err := s.DB.GetAllUsers(context.Background())
 	if err != nil {
 		return errors.New("could not get users")
@@ -144,7 +144,7 @@ func HandlerGetAllUsers(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerAggregator(s *state.State, cmd command) error {
+func HandlerAggregator(s *state.State, cmd Command) error {
 	if len(cmd.arguments) != 0 {
 		return errors.New("invalid arguments")
 	}
@@ -158,21 +158,16 @@ func HandlerAggregator(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerAddFeed(s *state.State, cmd command) error {
+func HandlerAddFeed(s *state.State, cmd Command, user database.User) error {
 	if len(cmd.arguments) != 2 {
 		return errors.New("invalid arguments")
 	}
 	feedName := cmd.arguments[0]
 	feedURL := cmd.arguments[1]
 
-	currentUsername := s.Cfg.CurrentUsername
-	currentUser, err := s.DB.GetUser(context.Background(), currentUsername)
-	if err != nil {
-		return err
-	}
-	currentUserID := currentUser.ID
+	currentUserID := user.ID
 
-	_, err = rss.FetchFeed(context.Background(), feedURL)
+	_, err := rss.FetchFeed(context.Background(), feedURL)
 	if err != nil {
 		return err
 	}
@@ -216,7 +211,7 @@ func HandlerAddFeed(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerFeeds(s *state.State, cmd command) error {
+func HandlerFeeds(s *state.State, cmd Command) error {
 	if len(cmd.arguments) != 0 {
 		return errors.New("invalid arguments")
 	}
@@ -251,16 +246,12 @@ func HandlerFeeds(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerFollow(s *state.State, cmd command) error {
+func HandlerFollow(s *state.State, cmd Command, user database.User) error {
 	if len(cmd.arguments) != 1 {
 		return errors.New("invalid arguments")
 	}
 
-	currentUsername := s.Cfg.CurrentUsername
-	userDB, err := s.DB.GetUser(context.Background(), currentUsername)
-	if err != nil {
-		return err
-	}
+	userDB := user
 	feedURL := cmd.arguments[0]
 	feedDB, err := s.DB.GetFeedsByUrl(context.Background(), feedURL)
 	if err != nil {
@@ -300,16 +291,12 @@ func HandlerFollow(s *state.State, cmd command) error {
 	return nil
 }
 
-func HandlerFollowing(s *state.State, cmd command) error {
+func HandlerFollowing(s *state.State, cmd Command, user database.User) error {
 	if len(cmd.arguments) != 0 {
 		return errors.New("invalid arguments")
 	}
 
-	currentUser := s.Cfg.CurrentUsername
-	userDB, err := s.DB.GetUser(context.Background(), currentUser)
-	if err != nil {
-		return err
-	}
+	userDB := user
 
 	following, err := s.DB.GetFeedFollowsForUser(context.Background(), uuid.NullUUID{
 		UUID:  userDB.ID,
@@ -324,4 +311,15 @@ func HandlerFollowing(s *state.State, cmd command) error {
 	}
 
 	return nil
+}
+
+func middlewareLoggedIn(handler func(s *state.State, cmd Command, user database.User) error) func(*state.State, Command) error {
+	return func(s *state.State, cmd Command) error {
+		user, err := s.DB.GetUser(context.Background(), s.Cfg.CurrentUsername)
+		if err != nil {
+			return err
+		}
+
+		return handler(s, cmd, user)
+	}
 }
