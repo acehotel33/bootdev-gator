@@ -33,6 +33,8 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("agg", HandlerAggregator)
 	cmds.Register("addfeed", HandlerAddFeed)
 	cmds.Register("feeds", HandlerFeeds)
+	cmds.Register("follow", HandlerFollow)
+	cmds.Register("following", HandlerFollowing)
 	return cmds, nil
 }
 
@@ -118,7 +120,7 @@ func HandlerReset(s *state.State, cmd command) error {
 	}
 
 	if err := s.DB.ResetUsers(context.Background()); err != nil {
-		return errors.New("could not reset users")
+		return err
 	}
 
 	fmt.Println("users reset")
@@ -192,6 +194,24 @@ func HandlerAddFeed(s *state.State, cmd command) error {
 		return err
 	}
 
+	createFeedFollowParams := database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID: uuid.NullUUID{
+			UUID:  currentUserID,
+			Valid: true,
+		},
+		FeedID: uuid.NullUUID{
+			UUID:  dbFeed.ID,
+			Valid: true,
+		},
+	}
+	_, err = s.DB.CreateFeedFollow(context.Background(), createFeedFollowParams)
+	if err != nil {
+		return err
+	}
+
 	fmt.Println(dbFeed)
 	return nil
 }
@@ -226,6 +246,81 @@ func HandlerFeeds(s *state.State, cmd command) error {
 		}
 
 		fmt.Println(params)
+	}
+
+	return nil
+}
+
+func HandlerFollow(s *state.State, cmd command) error {
+	if len(cmd.arguments) != 1 {
+		return errors.New("invalid arguments")
+	}
+
+	currentUsername := s.Cfg.CurrentUsername
+	userDB, err := s.DB.GetUser(context.Background(), currentUsername)
+	if err != nil {
+		return err
+	}
+	feedURL := cmd.arguments[0]
+	feedDB, err := s.DB.GetFeedsByUrl(context.Background(), feedURL)
+	if err != nil {
+		return err
+	}
+
+	feedFollowParams := database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID: uuid.NullUUID{
+			UUID:  userDB.ID,
+			Valid: true,
+		},
+		FeedID: uuid.NullUUID{
+			UUID:  feedDB.ID,
+			Valid: true,
+		},
+	}
+
+	feedFollowDB, err := s.DB.CreateFeedFollow(context.Background(), feedFollowParams)
+	if err != nil {
+		return err
+	}
+
+	type returnStruct struct {
+		feedName string
+		username string
+	}
+
+	returnParams := returnStruct{
+		feedName: feedFollowDB.FeedName,
+		username: feedFollowDB.UserName,
+	}
+
+	fmt.Println(returnParams)
+	return nil
+}
+
+func HandlerFollowing(s *state.State, cmd command) error {
+	if len(cmd.arguments) != 0 {
+		return errors.New("invalid arguments")
+	}
+
+	currentUser := s.Cfg.CurrentUsername
+	userDB, err := s.DB.GetUser(context.Background(), currentUser)
+	if err != nil {
+		return err
+	}
+
+	following, err := s.DB.GetFeedFollowsForUser(context.Background(), uuid.NullUUID{
+		UUID:  userDB.ID,
+		Valid: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	for i := range following {
+		fmt.Println(following[i].FeedName)
 	}
 
 	return nil
