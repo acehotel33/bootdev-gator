@@ -18,7 +18,7 @@ Gator is a command-line application that manages user interactions and RSS feed 
 - **Go Modules**: For dependency management.
 
 ## Project Structure
-
+```
 .
 ├─ internal 
 │  ├── commands   # Command handlers for CLI interactions 
@@ -27,39 +27,40 @@ Gator is a command-line application that manages user interactions and RSS feed 
 │  ├── rss        # RSS feed fetching and parsing 
 │  └── state      # Application state management 
 └─ main.go        # Main entry point for the application
+```
 
 ## Installation
 
 1. Clone the repository:
-   ```
-   git clone https://github.com/acehotel33/bootdev-gator.git
-   ```
+```
+git clone https://github.com/acehotel33/bootdev-gator.git
+```
 2. Install the dependencies:
 ```
-   git mod tidy
+git mod tidy
 ```
 3. Set up your PostgreSQL database and update the ```.gatorconfig.json``` file with your database connection string:
 ```
-  {
-    "db_url": "your_postgres_connection_string",
-    "current_user_name": ""
-  }
+{
+  "db_url": "your_postgres_connection_string",
+  "current_user_name": ""
+}
 ```
 4. Run the database migrations using goose:
 ```
-   goose up
+goose up
 ```
 ## Usage
 
 ### Available Commands
-- User Commands:
+**User Commands**:
 
 * register [username] - Register a new user.
 * login [username] - Log in with a specified username.
 * reset - Reset all users.
 * users - List all users.
 
-- Feed Management:
+**Feed Management**:
 
 * addfeed [feed_name] [feed_url] - Add a new RSS feed.
 * feeds - List all RSS feeds.
@@ -68,7 +69,7 @@ Gator is a command-line application that manages user interactions and RSS feed 
 * unfollow [feed_url] - Unfollow a feed.
 * browse [limit] - Browse posts from followed feeds.
 
-- Aggregator:
+**Aggregator**:
 
 * agg [interval] - Periodically collect RSS feeds with a given time interval (e.g., "1m" for 1 minute).
 
