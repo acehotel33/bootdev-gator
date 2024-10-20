@@ -1,11 +1,11 @@
 # Gator
 
-Gator is a command-line application that manages user interactions and RSS feed aggregation. It includes features like user login, registration, feed management, and periodic RSS feed aggregation.
+Gator is a command-line application that manages user interactions and RSS feed aggregation. It includes features like user login, registration, feed management, and automatic RSS feed aggregation.
 
 ## Features
 
 - **User Management**: Register, log in, reset users, and fetch user details.
-- **RSS Feed Management**: Add feeds, follow/unfollow feeds, and periodically scrape RSS feeds.
+- **RSS Feed Management**: Add feeds, follow/unfollow feeds, and scrape RSS feeds.
 - **Postgres Integration**: Connects to a PostgreSQL database to store user, feed, and post data.
 - **Command-line Interface**: Run various commands to manage users, feeds, and posts.
 
@@ -33,7 +33,7 @@ Gator is a command-line application that manages user interactions and RSS feed 
 
 1. Clone the repository:
 ```
-git clone https://github.com/acehotel33/bootdev-gator.git
+git clone https://github.com/acehotel33/bootdev-gator
 ```
 2. Install the dependencies:
 ```
