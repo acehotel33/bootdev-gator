@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/acehotel33/bootdev-gator/internal/database"
@@ -385,17 +386,59 @@ func scrapeFeeds(s *state.State, user database.User) error {
 		return err
 	}
 
-	fmt.Println("----------")
-	fmt.Printf("%v\n", markedFeed.Name)
-	fmt.Println("----------")
+	// fmt.Println("----------")
+	// fmt.Printf("%v\n", markedFeed.Name)
+	// fmt.Println("----------")
 
 	// fmt.Printf("fetched feed: %v\n", fetchedFeed)
 	fetchedItems := fetchedFeed.Channel.Item
 	for _, item := range fetchedItems {
-		fmt.Println(item.Title)
+
+		postDB, err := s.DB.CreatePost(context.Background(), database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Title:       sql.NullString{String: item.Title, Valid: true},
+			Url:         item.Link,
+			Description: sql.NullString{String: item.Description, Valid: true},
+			PublishedAt: sql.NullTime{Time: timeStringParser(item.PubDate), Valid: true},
+			FeedID:      uuid.NullUUID{UUID: markedFeed.ID, Valid: true},
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "unique constraint \"posts_url_key\"") {
+				fmt.Printf("ignoring existing post: %v\n", item.Title)
+			} else {
+				fmt.Println(err)
+			}
+		} else {
+			fmt.Printf("%v added to posts DB\n", postDB.Title)
+		}
+
 	}
 
 	return nil
+}
+
+func timeStringParser(s string) time.Time {
+
+	formats := []string{
+		time.RFC1123,
+		time.RFC822,
+		"2006-01-02T15:04:05-07:00"}
+
+	var parsedTime time.Time
+	var err error
+	for _, format := range formats {
+		parsedTime, err = time.Parse(format, s)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		parsedTime = time.Time{}
+	}
+
+	return parsedTime
 }
 
 func middlewareLoggedIn(handler func(s *state.State, cmd Command, user database.User) error) func(*state.State, Command) error {
