@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +39,7 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("follow", middlewareLoggedIn(HandlerFollow))
 	cmds.Register("following", middlewareLoggedIn(HandlerFollowing))
 	cmds.Register("unfollow", middlewareLoggedIn(HandlerUnfollow))
+	cmds.Register("browse", middlewareLoggedIn(HandlerBrowse))
 	return cmds, nil
 }
 
@@ -362,35 +364,30 @@ func HandlerUnfollow(s *state.State, cmd Command, user database.User) error {
 }
 
 func scrapeFeeds(s *state.State, user database.User) error {
-	// fmt.Println("Entered scrape func")
 	nextFeed, err := s.DB.GetNextFeedToFetch(context.Background(), uuid.NullUUID{UUID: user.ID, Valid: true})
 	if err != nil {
 		return err
 	}
 
-	// fmt.Printf("next feed: %v\n", nextFeed)
 	markFeedFetchedParams := database.MarkFeedFetchedParams{
 		ID:            nextFeed.ID,
 		LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
 	}
 
-	// fmt.Printf("created params for marking feed %v", markFeedFetchedParams)
 	markedFeed, err := s.DB.MarkFeedFetched(context.Background(), markFeedFetchedParams)
 	if err != nil {
 		return err
 	}
 
-	// fmt.Printf("marked feed: %v\n", markedFeed)
 	fetchedFeed, err := rss.FetchFeed(context.Background(), markedFeed.Url)
 	if err != nil {
 		return err
 	}
 
-	// fmt.Println("----------")
-	// fmt.Printf("%v\n", markedFeed.Name)
-	// fmt.Println("----------")
+	fmt.Println("----------")
+	fmt.Printf("Fetching feed: %v - %v\n", markedFeed.Name, markedFeed.Url)
+	fmt.Println("----------")
 
-	// fmt.Printf("fetched feed: %v\n", fetchedFeed)
 	fetchedItems := fetchedFeed.Channel.Item
 	for _, item := range fetchedItems {
 
@@ -406,7 +403,8 @@ func scrapeFeeds(s *state.State, user database.User) error {
 		})
 		if err != nil {
 			if strings.Contains(err.Error(), "unique constraint \"posts_url_key\"") {
-				fmt.Printf("ignoring existing post: %v\n", item.Title)
+				// fmt.Printf("ignoring existing post: %v\n", item.Title)
+				continue
 			} else {
 				fmt.Println(err)
 			}
@@ -439,6 +437,37 @@ func timeStringParser(s string) time.Time {
 	}
 
 	return parsedTime
+}
+
+func HandlerBrowse(s *state.State, cmd Command, user database.User) error {
+	if len(cmd.arguments) > 1 {
+		return errors.New("invalid arguments")
+	}
+
+	var limit int32
+	limit = 2
+	if len(cmd.arguments) == 1 {
+		limitInt, err := strconv.Atoi(cmd.arguments[0])
+		limit = int32(limitInt)
+		if err != nil {
+			limit = 2
+		}
+
+	}
+	postsDB, err := s.DB.GetPostsForUser(context.Background(), database.GetPostsForUserParams{UserID: uuid.NullUUID{UUID: user.ID, Valid: true}, Limit: limit})
+	if err != nil {
+		return err
+	}
+
+	for _, post := range postsDB {
+		fmt.Println("---------")
+		fmt.Println(post.Title.String)
+		fmt.Println(post.Description.String)
+		fmt.Println("---------")
+		fmt.Println()
+	}
+
+	return nil
 }
 
 func middlewareLoggedIn(handler func(s *state.State, cmd Command, user database.User) error) func(*state.State, Command) error {
