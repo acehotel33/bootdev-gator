@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -30,7 +31,7 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("register", HandlerRegister)
 	cmds.Register("reset", HandlerReset)
 	cmds.Register("users", HandlerGetAllUsers)
-	cmds.Register("agg", HandlerAggregator)
+	cmds.Register("agg", middlewareLoggedIn(HandlerAggregator))
 	cmds.Register("addfeed", middlewareLoggedIn(HandlerAddFeed))
 	cmds.Register("feeds", HandlerFeeds)
 	cmds.Register("follow", middlewareLoggedIn(HandlerFollow))
@@ -145,18 +146,34 @@ func HandlerGetAllUsers(s *state.State, cmd Command) error {
 	return nil
 }
 
-func HandlerAggregator(s *state.State, cmd Command) error {
-	if len(cmd.arguments) != 0 {
+func HandlerAggregator(s *state.State, cmd Command, user database.User) error {
+	if len(cmd.arguments) != 1 {
 		return errors.New("invalid arguments")
 	}
 
-	rssFeed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	timeBetweenReqs := cmd.arguments[0]
+	timeDuration, err := time.ParseDuration(timeBetweenReqs)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Collecting feeds every %v\n", timeDuration)
 
-	fmt.Println(rssFeed)
-	return nil
+	// rssFeed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// fmt.Println(rssFeed)
+	// return nil
+
+	ticker := time.NewTicker(timeDuration)
+
+	// fmt.Println("Ticker created")
+
+	for ; ; <-ticker.C {
+		scrapeFeeds(s, user)
+	}
+
 }
 
 func HandlerAddFeed(s *state.State, cmd Command, user database.User) error {
@@ -338,6 +355,44 @@ func HandlerUnfollow(s *state.State, cmd Command, user database.User) error {
 	_, err = s.DB.DeleteFeedFollow(context.Background(), deleteFeedFollowParams)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func scrapeFeeds(s *state.State, user database.User) error {
+	// fmt.Println("Entered scrape func")
+	nextFeed, err := s.DB.GetNextFeedToFetch(context.Background(), uuid.NullUUID{UUID: user.ID, Valid: true})
+	if err != nil {
+		return err
+	}
+
+	// fmt.Printf("next feed: %v\n", nextFeed)
+	markFeedFetchedParams := database.MarkFeedFetchedParams{
+		ID:            nextFeed.ID,
+		LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+	}
+
+	// fmt.Printf("created params for marking feed %v", markFeedFetchedParams)
+	markedFeed, err := s.DB.MarkFeedFetched(context.Background(), markFeedFetchedParams)
+	if err != nil {
+		return err
+	}
+
+	// fmt.Printf("marked feed: %v\n", markedFeed)
+	fetchedFeed, err := rss.FetchFeed(context.Background(), markedFeed.Url)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("----------")
+	fmt.Printf("%v\n", markedFeed.Name)
+	fmt.Println("----------")
+
+	// fmt.Printf("fetched feed: %v\n", fetchedFeed)
+	fetchedItems := fetchedFeed.Channel.Item
+	for _, item := range fetchedItems {
+		fmt.Println(item.Title)
 	}
 
 	return nil
