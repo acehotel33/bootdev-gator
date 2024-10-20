@@ -12,6 +12,6 @@ VALUES (
 -- name: GetFeeds :many
 SELECT * FROM feeds;
 
--- name: GetFeedsByUrl :one
+-- name: GetFeedByUrl :one
 SELECT * FROM feeds
 WHERE url = $1;

@@ -35,6 +35,7 @@ func InitializeCommands() (*Commands, error) {
 	cmds.Register("feeds", HandlerFeeds)
 	cmds.Register("follow", middlewareLoggedIn(HandlerFollow))
 	cmds.Register("following", middlewareLoggedIn(HandlerFollowing))
+	cmds.Register("unfollow", middlewareLoggedIn(HandlerUnfollow))
 	return cmds, nil
 }
 
@@ -253,7 +254,7 @@ func HandlerFollow(s *state.State, cmd Command, user database.User) error {
 
 	userDB := user
 	feedURL := cmd.arguments[0]
-	feedDB, err := s.DB.GetFeedsByUrl(context.Background(), feedURL)
+	feedDB, err := s.DB.GetFeedByUrl(context.Background(), feedURL)
 	if err != nil {
 		return err
 	}
@@ -308,6 +309,35 @@ func HandlerFollowing(s *state.State, cmd Command, user database.User) error {
 
 	for i := range following {
 		fmt.Println(following[i].FeedName)
+	}
+
+	return nil
+}
+
+func HandlerUnfollow(s *state.State, cmd Command, user database.User) error {
+	if len(cmd.arguments) != 1 {
+		return errors.New("invalid arguments")
+	}
+
+	feedURL := cmd.arguments[0]
+	feedDB, err := s.DB.GetFeedByUrl(context.Background(), feedURL)
+	if err != nil {
+		return err
+	}
+
+	deleteFeedFollowParams := database.DeleteFeedFollowParams{
+		UserID: uuid.NullUUID{
+			UUID:  user.ID,
+			Valid: true,
+		},
+		FeedID: uuid.NullUUID{
+			UUID:  feedDB.ID,
+			Valid: true,
+		},
+	}
+	_, err = s.DB.DeleteFeedFollow(context.Background(), deleteFeedFollowParams)
+	if err != nil {
+		return err
 	}
 
 	return nil
